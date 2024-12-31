@@ -228,6 +228,21 @@ def markRead_Message(messageId):
     return data
 
 
+def save_message(number, text, response, messageId):
+    try:
+        conn = sqlite3.connect(os.environ.get('DB_PATH'))
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO messages 
+            (phone_number, message_text, response, timestamp, message_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (number, text, str(response), datetime.now(), messageId))
+        conn.commit()
+    except Exception as e:
+        print(f"Error saving message: {e}")
+    finally:
+        conn.close()
+    
 
 def administrar_chatbot(text,number, messageId, name):
     text = text.lower()
@@ -355,24 +370,7 @@ def administrar_chatbot(text,number, messageId, name):
         response = enviar_Mensaje_whatsapp(item)
         responses.append(response)
         
-    # Guardar el mensaje en la base de datos
-    conn = sqlite3.connect('messages.db')
-    c = conn.cursor()
-   # Guardar en la base de datos
-    response_text = str(responses)
-    try:
-        c.execute('''
-            INSERT INTO messages 
-            (phone_number, message_text, response, timestamp, message_id)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (number, text, response_text, datetime.now(), messageId))
-        conn.commit()
-        print("Mensaje guardado en la base de datos")
-    except sqlite3.Error as e:
-        print("Error al guardar en la base de datos:", str(e))
-    finally:
-        conn.close()
-            
+    save_message(number, text, str(responses), messageId)
     
     return responses
 
