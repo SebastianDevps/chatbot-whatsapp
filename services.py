@@ -109,11 +109,15 @@ def buttonReply_Message(number, options, body, footer, sedd,messageId):
 def listReply_Message(number, options, body, footer, sedd,messageId):
     rows = []
     for i, option in enumerate(options):
+        # Limitar el título a 24 caracteres
+        title = option[:24] if len(option) > 24 else option
+        description = option[24:] if len(option) > 24 else ""
+        
         rows.append(
             {
                 "id": sedd + "_row_" + str(i+1),
-                "title": option,
-                "description": ""
+                "title": title,
+                "description": description
             }
         )
 
@@ -228,21 +232,49 @@ def markRead_Message(messageId):
     return data
 
 
-def save_message(number, text, response, messageId):
+def save_message(number, text, responses, messageId):
     try:
-        conn = sqlite3.connect(os.environ.get('DB_PATH'))
+        conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        
+        # Guardar el mensaje del usuario
         c.execute('''
             INSERT INTO messages 
-            (phone_number, message_text, response, timestamp, message_id)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (number, text, str(response), datetime.now(), messageId))
+            (phone_number, message_text, response, timestamp, message_id, is_user)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (number, text, None, datetime.now(), messageId, True))
+        
+        # Extraer y guardar las respuestas del bot
+        for response in responses:
+            try:
+                # Decodificar el JSON de la respuesta para obtener el mensaje real
+                response_data = json.loads(response[0])
+                bot_message = ""
+                
+                # Extraer el texto según el tipo de mensaje
+                if response_data.get('type') == 'text':
+                    bot_message = response_data['text']['body']
+                elif response_data.get('type') == 'interactive':
+                    if 'list' in response_data['interactive']:
+                        bot_message = response_data['interactive']['body']['text']
+                    elif 'button' in response_data['interactive']:
+                        bot_message = response_data['interactive']['body']['text']
+                
+                c.execute('''
+                    INSERT INTO messages 
+                    (phone_number, message_text, response, timestamp, message_id, is_user)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (number, bot_message, str(response[1]), datetime.now(), None, False))
+                
+            except json.JSONDecodeError:
+                print(f"Error decodificando respuesta: {response}")
+                continue
+            
         conn.commit()
     except Exception as e:
-        print(f"Error saving message: {e}")
+        print(f"Error guardando mensaje: {e}")
     finally:
         conn.close()
-    
 
 def administrar_chatbot(text,number, messageId, name):
     text = text.lower()
@@ -368,11 +400,12 @@ def administrar_chatbot(text,number, messageId, name):
     responses = []
     for item in list:
         response = enviar_Mensaje_whatsapp(item)
-        responses.append(response)
-        
-    save_message(number, text, str(responses), messageId)
+        responses.append((item, response[0]))  # Guardamos el mensaje enviado y su respuesta
     
-    return responses
+    # Guardar mensajes en la BD
+    save_message(number, text, responses, messageId)
+    
+    return [resp[1] for resp in responses]
 
 #al parecer para mexico, whatsapp agrega 521 como prefijo en lugar de 52,
 # este codigo soluciona ese inconveniente.

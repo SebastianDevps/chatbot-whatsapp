@@ -21,7 +21,7 @@ class AnalizadorDeReseñas:
         # Definir el prompt del sistema
         self.system_prompt = """
         Eres un asistente de pizzería que responde de manera fluida y natural.
-        Debes responder siempre en formato JSON usando esta estructura exacta: {"respuesta": "tu respuesta aquí"}
+        Debes responder siempre en formato JSON usando esta estructura exacta, las opciones para botones no deben ser muy largas, el titulo debe ser de 24 caracteres: {"respuesta": "tu respuesta aquí"}
         """
 
     def generar_info(self, data):

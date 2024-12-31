@@ -23,7 +23,8 @@ def init_db():
                 message_text TEXT,
                 response TEXT,
                 timestamp DATETIME,
-                message_id TEXT
+                message_id TEXT,
+                is_user BOOLEAN
             )
         ''')
         conn.commit()

@@ -379,12 +379,12 @@
                 {% if selected_phone %}
                     {% for message in messages %}
                         {% if message[1] == selected_phone %}
-                        <div class="message {% if 'bot' in message[3].lower() %}bot-message{% else %}user-message{% endif %}">
+                        <div class="message {% if message[6] %}user-message{% else %}bot-message{% endif %}">
                             <div class="message-content">
                                 {{ message[2] }}
-                                {% if message[3] %}
+                                {% if not message[6] and message[3] %}
                                 <div class="response-details">
-                                    {{ message[3] }}
+                                    <small>Status: {{ message[3] }}</small>
                                 </div>
                                 {% endif %}
                             </div>
