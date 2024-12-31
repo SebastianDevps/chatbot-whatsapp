@@ -7,23 +7,22 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 import certifi
-import ssl
 
 app = Flask(__name__)
 
-# Configuración de MongoDB con opciones SSL específicas
+# Configuración de MongoDB
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
 
-# Configuración del cliente con opciones SSL específicas
+# Configuración del cliente con opciones simplificadas
 client = MongoClient(
     MONGODB_URI,
     server_api=ServerApi('1'),
     tlsCAFile=certifi.where(),
-    ssl=True,
-    ssl_cert_reqs=ssl.CERT_NONE,  # Deshabilitar verificación de certificado
-    connectTimeoutMS=30000,  # Aumentar timeout de conexión
-    socketTimeoutMS=30000,   # Aumentar timeout de socket
-    serverSelectionTimeoutMS=30000  # Aumentar timeout de selección de servidor
+    tls=True,
+    tlsAllowInvalidCertificates=True,  # Reemplaza ssl_cert_reqs
+    connectTimeoutMS=30000,
+    socketTimeoutMS=30000,
+    serverSelectionTimeoutMS=30000
 )
 
 try:
@@ -47,7 +46,6 @@ def init_db():
             messages_collection.create_index("timestamp")
     except Exception as e:
         print(f"Error al conectar con MongoDB: {e}")
-        # No levantar el error para permitir que la aplicación continúe
         return False
     return True
 

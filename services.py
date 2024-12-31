@@ -18,8 +18,8 @@ client = MongoClient(
     MONGODB_URI,
     server_api=ServerApi('1'),
     tlsCAFile=certifi.where(),
-    ssl=True,
-    ssl_cert_reqs=ssl.CERT_NONE,
+    tls=True,
+    tlsAllowInvalidCertificates=True,
     connectTimeoutMS=30000,
     socketTimeoutMS=30000,
     serverSelectionTimeoutMS=30000
