@@ -2,8 +2,9 @@ import requests
 import os
 import json
 import time
-from flask import request, jsonify
 from Reseña_Analisis import AnalizadorDeReseñas
+from datetime import datetime
+import sqlite3
 
 def obtener_Mensaje_whatsapp(message):
     if 'type' not in message :
@@ -27,21 +28,34 @@ def obtener_Mensaje_whatsapp(message):
 
 def enviar_Mensaje_whatsapp(data):
     try:
-        whatsapp_token = os.getenv('whatsapp_token')
-        whatsapp_url = os.getenv('whatsapp_url')
-        headers = {'Content-Type': 'application/json',
-                   'Authorization': 'Bearer ' + whatsapp_token}
-        print("se envia ", data)
-        response = requests.post(whatsapp_url, 
-                                 headers=headers, 
-                                 data=data)
+        whatsapp_token = os.environ.get('WHATSAPP_TOKEN')  # Asegúrate de que sea el nombre correcto
+        whatsapp_url = os.environ.get('WHATSAPP_URL')
+        
+        if not whatsapp_token or not whatsapp_url:
+            print("Error: Token o URL no configurados")
+            return 'Error de configuración', 500
+
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {whatsapp_token}'
+        }
+        
+        # print("Enviando mensaje con token:", whatsapp_token[:10] + "...")  # Solo para debug
+        # print("URL:", whatsapp_url)
+        print("Datos:", data)
+        
+        response = requests.post(whatsapp_url, headers=headers, data=data)
+        
+        print("Respuesta de WhatsApp:", response.status_code, response.text)  # Debug
         
         if response.status_code == 200:
             return 'mensaje enviado', 200
         else:
-            return 'error al enviar mensaje', response.status_code
+            return f'error al enviar mensaje: {response.text}', response.status_code
+            
     except Exception as e:
-        return e,403
+        print("Error en enviar_Mensaje_whatsapp:", str(e))
+        return str(e), 403
     
 def text_Message(number,text):
     data = json.dumps(
@@ -340,7 +354,26 @@ def administrar_chatbot(text,number, messageId, name):
     for item in list:
         response = enviar_Mensaje_whatsapp(item)
         responses.append(response)
-
+        
+    # Guardar el mensaje en la base de datos
+    conn = sqlite3.connect('messages.db')
+    c = conn.cursor()
+   # Guardar en la base de datos
+    response_text = str(responses)
+    try:
+        c.execute('''
+            INSERT INTO messages 
+            (phone_number, message_text, response, timestamp, message_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (number, text, response_text, datetime.now(), messageId))
+        conn.commit()
+        print("Mensaje guardado en la base de datos")
+    except sqlite3.Error as e:
+        print("Error al guardar en la base de datos:", str(e))
+    finally:
+        conn.close()
+            
+    
     return responses
 
 #al parecer para mexico, whatsapp agrega 521 como prefijo en lugar de 52,
