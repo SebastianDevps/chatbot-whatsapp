@@ -19,7 +19,7 @@ client = MongoClient(
     server_api=ServerApi('1'),
     tlsCAFile=certifi.where(),
     tls=True,
-    tlsAllowInvalidCertificates=True,  # Reemplaza ssl_cert_reqs
+    tlsAllowInvalidCertificates=True,
     connectTimeoutMS=30000,
     socketTimeoutMS=30000,
     serverSelectionTimeoutMS=30000
@@ -49,9 +49,8 @@ def init_db():
         return False
     return True
 
-@app.before_first_request
-def initialize():
-    """Inicializar la base de datos antes de la primera petición"""
+# Reemplazar before_first_request con with app.app_context()
+with app.app_context():
     init_db()
 
 @app.route('/bienvenido', methods=['GET'])
