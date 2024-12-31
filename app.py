@@ -16,6 +16,7 @@ def init_db():
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        
         c.execute('''
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +25,7 @@ def init_db():
                 response TEXT,
                 timestamp DATETIME,
                 message_id TEXT,
-                is_user BOOLEAN
+                is_user BOOLEAN DEFAULT FALSE
             )
         ''')
         conn.commit()
@@ -62,19 +63,21 @@ def verificar_token():
 def recibir_mensajes():
     try:
         body = request.get_json()
+        print(body)
         entry = body['entry'][0]
         changes = entry['changes'][0]
         value = changes['value']
         message = value['messages'][0]
-        number = services.replace_start(message['from'])
+        number = message['from']
         messageId = message['id']
-        # contacts = value['contacts'][0]
-        # name = contacts['profile']['name']
+        timestamp = int(message['timestamp'])
+        contacts = value['contacts'][0]
+        name = contacts['profile']['name']
         text = services.obtener_Mensaje_whatsapp(message)
         
-
-        response = services.administrar_chatbot(text, number, messageId, "Usuario Web")
-        return jsonify({"status": "success", "response": response})
+        response = services.administrar_chatbot(text, number,messageId,name)
+        print("response webhook: ", response)
+        return "Enviado"
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400

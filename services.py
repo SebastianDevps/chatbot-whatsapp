@@ -45,13 +45,17 @@ def enviar_Mensaje_whatsapp(data):
         print("Datos:", data)
         
         response = requests.post(whatsapp_url, headers=headers, data=data)
-        
-        print("Respuesta de WhatsApp:", response.status_code, response.text)  # Debug
+
+        print(f"Status Code: {response.status_code}")
+        print(f"Response Text: {response.text}")
         
         if response.status_code == 200:
-            return 'mensaje enviado', 200
+            return ('mensaje enviado', 200)
         else:
-            return f'error al enviar mensaje: {response.text}', response.status_code
+            error_msg = f'Error al enviar mensaje: {response.status_code} - {response.text}'
+            print(error_msg)
+            return (error_msg, response.status_code)
+         
             
     except Exception as e:
         print("Error en enviar_Mensaje_whatsapp:", str(e))
@@ -234,7 +238,7 @@ def markRead_Message(messageId):
 
 def save_message(number, text, responses, messageId):
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(os.environ.get('DB_PATH', 'messages.db'))
         c = conn.cursor()
         
         # Guardar el mensaje del usuario
@@ -260,26 +264,32 @@ def save_message(number, text, responses, messageId):
                     elif 'button' in response_data['interactive']:
                         bot_message = response_data['interactive']['body']['text']
                 
-                c.execute('''
-                    INSERT INTO messages 
-                    (phone_number, message_text, response, timestamp, message_id, is_user)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (number, bot_message, str(response[1]), datetime.now(), None, False))
+                if bot_message:  # Solo guardar si hay mensaje
+                    c.execute('''
+                        INSERT INTO messages 
+                        (phone_number, message_text, response, timestamp, message_id, is_user)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    ''', (number, bot_message, str(response[1]), datetime.now(), None, False))
                 
             except json.JSONDecodeError:
                 print(f"Error decodificando respuesta: {response}")
                 continue
+            except Exception as e:
+                print(f"Error procesando respuesta: {e}")
+                continue
             
         conn.commit()
+        print("Mensaje guardado correctamente")
     except Exception as e:
         print(f"Error guardando mensaje: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 def administrar_chatbot(text,number, messageId, name):
     text = text.lower()
     list = []
-    print("mensaje del usuario: ",text)
+    print("mensaje de "+ name + ": ",text)
 
     markRead = markRead_Message(messageId)
     list.append(markRead)
