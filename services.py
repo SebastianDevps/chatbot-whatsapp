@@ -5,6 +5,13 @@ import time
 from Reseña_Analisis import AnalizadorDeReseñas
 from datetime import datetime
 import sqlite3
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+
+# Configuración de MongoDB
+client = MongoClient(os.getenv('MONGODB_URI'), server_api=ServerApi('1'))
+db = client['whatsapp_bot']
+messages_collection = db['messages']
 
 def obtener_Mensaje_whatsapp(message):
     if 'type' not in message :
@@ -44,11 +51,9 @@ def enviar_Mensaje_whatsapp(data):
         response = requests.post(whatsapp_url, headers=headers, data=data)
 
         print(f"Status Code: {response.status_code}")
-        print(f"Response Text: {response.text}")
         
         if response.status_code == 200:
-            save_message(data)
-            return data
+            return response.text
         else:
             error_msg = f'Error al enviar mensaje: {response.status_code} - {response.text}'
             print(error_msg)
@@ -234,17 +239,19 @@ def markRead_Message(messageId):
     return data
 
 
+
 def save_message(number, text, responses, messageId):
     try:
-        conn = sqlite3.connect(os.environ.get('DB_PATH', 'messages.db'))
-        c = conn.cursor()
-        
         # Guardar el mensaje del usuario
-        c.execute('''
-            INSERT INTO messages 
-            (phone_number, message_text, response, timestamp, message_id, is_user)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (number, text, None, datetime.now(), messageId, True))
+        user_message = {
+            "phone_number": number,
+            "message_text": text,
+            "response": None,
+            "timestamp": datetime.now(),
+            "message_id": messageId,
+            "is_user": True
+        }
+        messages_collection.insert_one(user_message)
         
         # Extraer y guardar las respuestas del bot
         for response in responses:
@@ -256,13 +263,13 @@ def save_message(number, text, responses, messageId):
                 if response_data.get('type') == 'text':
                     bot_message = response_data['text']['body']
                 elif response_data.get('type') == 'reaction':
-                    continue  # Saltamos las reacciones ya que no son mensajes de texto
+                    continue
                 elif response_data.get('type') == 'interactive':
                     if 'interactive' in response_data:
                         if 'body' in response_data['interactive']:
                             bot_message = response_data['interactive']['body']['text']
                             
-                        # Agregar opciones al mensaje si existen
+                        # Agregar opciones al mensaje
                         if 'action' in response_data['interactive']:
                             if 'buttons' in response_data['interactive']['action']:
                                 options = [btn['reply']['title'] for btn in response_data['interactive']['action']['buttons']]
@@ -271,28 +278,26 @@ def save_message(number, text, responses, messageId):
                                 options = [row['title'] for section in response_data['interactive']['action']['sections'] for row in section['rows']]
                                 bot_message += "\nOpciones: " + ", ".join(options)
                 
-                if bot_message:  # Solo guardar si hay mensaje
+                if bot_message:
                     response_status = "sent" if isinstance(response[1], str) else str(response[1])
-                    c.execute('''
-                        INSERT INTO messages 
-                        (phone_number, message_text, response, timestamp, message_id, is_user)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (number, bot_message, response_status, datetime.now(), None, False))
+                    bot_response = {
+                        "phone_number": number,
+                        "message_text": bot_message,
+                        "response": response_status,
+                        "timestamp": datetime.now(),
+                        "message_id": None,
+                        "is_user": False
+                    }
+                    messages_collection.insert_one(bot_response)
                 
-            except json.JSONDecodeError as e:
-                print(f"Error decodificando respuesta: {e}")
-                continue
             except Exception as e:
                 print(f"Error procesando respuesta: {e}")
                 continue
             
-        conn.commit()
         print("Mensaje guardado correctamente")
     except Exception as e:
         print(f"Error guardando mensaje: {e}")
-    finally:
-        if conn:
-            conn.close()
+
 
 def administrar_chatbot(text,number, messageId, name):
     text = text.lower()

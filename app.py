@@ -2,43 +2,32 @@ from flask import Flask, request, render_template
 import services
 from flask import jsonify
 import os
-import sqlite3
-from pathlib import Path
 from datetime import datetime
-import tempfile
+from pymongo.mongo_client import MongoClient
+from pymongo.server_api import ServerApi
+from bson.objectid import ObjectId
 
 app = Flask(__name__)
 
-# Usar directorio temporal para la base de datos
-DB_PATH = os.path.join(tempfile.gettempdir(), 'messages.db')
+# Configuración de MongoDB
+client = MongoClient(os.getenv('MONGODB_URI'), server_api=ServerApi('1'))
+db = client['whatsapp_bot']  # Nombre de la base de datos
+messages_collection = db['messages']  # Nombre de la colección
 
 def init_db():
     try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
+        # Verificar conexión
+        client.admin.command('ping')
+        print("¡Conexión exitosa a MongoDB!")
         
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                phone_number TEXT,
-                message_text TEXT,
-                response TEXT,
-                timestamp DATETIME,
-                message_id TEXT,
-                is_user BOOLEAN DEFAULT FALSE
-            )
-        ''')
-        conn.commit()
+        # Crear índices si es necesario
+        messages_collection.create_index("phone_number")
+        messages_collection.create_index("timestamp")
     except Exception as e:
-        print(f"Error initializing DB: {e}")
-    finally:
-        conn.close()
-
-# Llamar a init_db al inicio de la aplicación
-init_db()
+        print(f"Error al conectar con MongoDB: {e}")
 
 @app.route('/bienvenido', methods=['GET'])
-def  bienvenido():
+def bienvenido():
     return 'Hola, desde Flask'
 
 @app.route('/webhook', methods=['GET'])
@@ -52,8 +41,8 @@ def verificar_token():
         else:
             return 'token incorrecto', 403
     except Exception as e:
-        return e,403
-    
+        return str(e), 403
+
 @app.route('/webhook', methods=['POST'])
 def recibir_mensajes():
     try:
@@ -69,7 +58,7 @@ def recibir_mensajes():
         name = contacts['profile']['name']
         text = services.obtener_Mensaje_whatsapp(message)
         
-        services.administrar_chatbot(text, number,messageId,name)
+        services.administrar_chatbot(text, number, messageId, name)
         return "Enviado"
 
     except Exception as e:
@@ -78,20 +67,21 @@ def recibir_mensajes():
 @app.route('/messages')
 def view_messages():
     try:
-        conn = sqlite3.connect(os.environ.get('DB_PATH'))
-        c = conn.cursor()
-        
         phone = request.args.get('phone')
         
+        # Consulta de mensajes
         if phone:
-            c.execute('SELECT * FROM messages WHERE phone_number = ? ORDER BY timestamp DESC', (phone,))
+            messages = messages_collection.find(
+                {"phone_number": phone}
+            ).sort("timestamp", -1)
         else:
-            c.execute('SELECT * FROM messages ORDER BY timestamp DESC')
+            messages = messages_collection.find().sort("timestamp", -1)
         
-        messages = c.fetchall()
+        # Convertir cursor a lista
+        messages = list(messages)
         
-        c.execute('SELECT DISTINCT phone_number FROM messages')
-        phone_numbers = [row[0] for row in c.fetchall()]
+        # Obtener números de teléfono únicos
+        phone_numbers = messages_collection.distinct("phone_number")
         
         return render_template('messages.html', 
                              messages=messages, 
@@ -100,18 +90,12 @@ def view_messages():
     except Exception as e:
         print(f"Error in view_messages: {e}")
         return str(e), 500
-    finally:
-        conn.close()
 
-
-    
-    # Inicializar la base de datos al arrancar
+# Inicializar la base de datos al arrancar
 with app.app_context():
     init_db()
 
 if __name__ == '__main__':
     app.run()
-    # app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)))
-
 
 app = app

@@ -339,16 +339,16 @@
                     <div class="chat-info">
                         <div class="chat-header">
                             <span class="chat-name">{{ phone }}</span>
-                            {% for message in messages if message[1] == phone %}
-                                {% if loop.first %}
-                                    <span class="chat-time">{{ message[4].split()[1][:5] }}</span>
+                            {% for message in messages %}
+                                {% if loop.first and message.phone_number == phone %}
+                                    <span class="chat-time">{{ message.timestamp.strftime('%H:%M') }}</span>
                                 {% endif %}
                             {% endfor %}
                         </div>
                         <div class="chat-preview">
-                            {% for message in messages if message[1] == phone %}
-                                {% if loop.first %}
-                                    {{ message[2][:30] }}{% if message[2]|length > 30 %}...{% endif %}
+                            {% for message in messages %}
+                                {% if loop.first and message.phone_number == phone %}
+                                    {{ message.message_text[:30] }}{% if message.message_text|length > 30 %}...{% endif %}
                                 {% endif %}
                             {% endfor %}
                         </div>
@@ -378,18 +378,18 @@
             <div class="chat-messages">
                 {% if selected_phone %}
                     {% for message in messages %}
-                        {% if message[1] == selected_phone %}
-                        <div class="message {% if message[6] %}user-message{% else %}bot-message{% endif %}">
+                        {% if message.phone_number == selected_phone %}
+                        <div class="message {% if message.is_user %}user-message{% else %}bot-message{% endif %}">
                             <div class="message-content">
-                                {{ message[2] }}
-                                {% if not message[6] and message[3] %}
+                                {{ message.message_text }}
+                                {% if not message.is_user and message.response %}
                                 <div class="response-details">
-                                    <small>Status: {{ message[3] }}</small>
+                                    <small>Status: {{ message.response }}</small>
                                 </div>
                                 {% endif %}
                             </div>
                             <div class="message-meta">
-                                {{ message[4].split()[1] }}
+                                {{ message.timestamp.strftime('%H:%M') }}
                                 <span class="message-status">
                                     <i class="fas fa-check-double" style="color: #53bdeb;"></i>
                                 </span>
