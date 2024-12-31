@@ -1,5 +1,5 @@
 import requests
-import sett
+import os
 import json
 import time
 from flask import request, jsonify
@@ -27,8 +27,8 @@ def obtener_Mensaje_whatsapp(message):
 
 def enviar_Mensaje_whatsapp(data):
     try:
-        whatsapp_token = sett.whatsapp_token
-        whatsapp_url = sett.whatsapp_url
+        whatsapp_token = os.getenv('whatsapp_token')
+        whatsapp_url = os.getenv('whatsapp_url')
         headers = {'Content-Type': 'application/json',
                    'Authorization': 'Bearer ' + whatsapp_token}
         print("se envia ", data)
@@ -164,7 +164,7 @@ def sticker_Message(number, sticker_id):
 def get_media_id(media_name , media_type):
     media_id = ""
     if media_type == "sticker":
-        media_id = sett.stickers.get(media_name, None)
+        media_id = os.getenv('stickers').get(media_name, None)
     #elif media_type == "image":
     #    media_id = sett.images.get(media_name, None)
     #elif media_type == "video":

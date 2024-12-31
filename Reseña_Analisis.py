@@ -1,11 +1,10 @@
 import json
 import google.generativeai as genai
-
-api_key = "AIzaSyCmDGu2Ry9l52-ahYG_Dl2eYuGjJMm_Yqg"
+import os
 
 class AnalizadorDeReseñas:
     def __init__(self):
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=os.getenv('api_key'))
         self.generation_config = {
             "temperature": 1,
             "top_p": 0.95,
