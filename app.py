@@ -1,5 +1,4 @@
 from flask import Flask, request, render_template   
-import sett 
 import services
 from flask import jsonify
 import os
