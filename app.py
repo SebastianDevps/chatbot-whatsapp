@@ -7,36 +7,54 @@ from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
 import certifi
+import ssl
 
 app = Flask(__name__)
 
-# Configuración de MongoDB con opciones SSL
+# Configuración de MongoDB con opciones SSL específicas
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
 
-# Opciones de conexión actualizadas
+# Configuración del cliente con opciones SSL específicas
 client = MongoClient(
     MONGODB_URI,
     server_api=ServerApi('1'),
-    tlsCAFile=certifi.where(),  # Agregar certificado SSL
+    tlsCAFile=certifi.where(),
     ssl=True,
-    connect=True
+    ssl_cert_reqs=ssl.CERT_NONE,  # Deshabilitar verificación de certificado
+    connectTimeoutMS=30000,  # Aumentar timeout de conexión
+    socketTimeoutMS=30000,   # Aumentar timeout de socket
+    serverSelectionTimeoutMS=30000  # Aumentar timeout de selección de servidor
 )
 
-db = client['whatsapp_bot']
-messages_collection = db['messages']
+try:
+    db = client['whatsapp_bot']
+    messages_collection = db['messages']
+except Exception as e:
+    print(f"Error inicial al conectar con MongoDB: {e}")
+    db = None
+    messages_collection = None
 
 def init_db():
     try:
-        # Verificar conexión
-        client.admin.command('ping')
+        # Verificar conexión sin usar ping
+        dbs = client.list_database_names()
         print("¡Conexión exitosa a MongoDB!")
+        print(f"Bases de datos disponibles: {dbs}")
         
-        # Crear índices
-        messages_collection.create_index("phone_number")
-        messages_collection.create_index("timestamp")
+        if db and messages_collection:
+            # Crear índices si es necesario
+            messages_collection.create_index("phone_number")
+            messages_collection.create_index("timestamp")
     except Exception as e:
         print(f"Error al conectar con MongoDB: {e}")
-        raise  # Re-lanzar el error para mejor debugging
+        # No levantar el error para permitir que la aplicación continúe
+        return False
+    return True
+
+@app.before_first_request
+def initialize():
+    """Inicializar la base de datos antes de la primera petición"""
+    init_db()
 
 @app.route('/bienvenido', methods=['GET'])
 def bienvenido():
@@ -102,10 +120,6 @@ def view_messages():
     except Exception as e:
         print(f"Error in view_messages: {e}")
         return str(e), 500
-
-# Inicializar la base de datos al arrancar
-with app.app_context():
-    init_db()
 
 if __name__ == '__main__':
     app.run()

@@ -8,21 +8,30 @@ import sqlite3
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 import certifi
+import ssl
 
-# Configuración de MongoDB con opciones SSL
+# Configuración de MongoDB con opciones SSL específicas
 MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
 
-# Opciones de conexión actualizadas
+# Configuración del cliente con opciones SSL específicas
 client = MongoClient(
     MONGODB_URI,
     server_api=ServerApi('1'),
-    tlsCAFile=certifi.where(),  # Agregar certificado SSL
+    tlsCAFile=certifi.where(),
     ssl=True,
-    connect=True
+    ssl_cert_reqs=ssl.CERT_NONE,
+    connectTimeoutMS=30000,
+    socketTimeoutMS=30000,
+    serverSelectionTimeoutMS=30000
 )
 
-db = client['whatsapp_bot']
-messages_collection = db['messages']
+try:
+    db = client['whatsapp_bot']
+    messages_collection = db['messages']
+except Exception as e:
+    print(f"Error inicial al conectar con MongoDB en services: {e}")
+    db = None
+    messages_collection = None
 
 def obtener_Mensaje_whatsapp(message):
     if 'type' not in message :
