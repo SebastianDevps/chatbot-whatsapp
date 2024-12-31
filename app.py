@@ -37,11 +37,6 @@ def init_db():
 # Llamar a init_db al inicio de la aplicación
 init_db()
 
-@app.route('/chat')
-def chat():
-    return render_template('chat.html')
-
-
 @app.route('/bienvenido', methods=['GET'])
 def  bienvenido():
     return 'Hola, desde Flask'
@@ -63,7 +58,6 @@ def verificar_token():
 def recibir_mensajes():
     try:
         body = request.get_json()
-        print(body)
         entry = body['entry'][0]
         changes = entry['changes'][0]
         value = changes['value']
@@ -75,8 +69,7 @@ def recibir_mensajes():
         name = contacts['profile']['name']
         text = services.obtener_Mensaje_whatsapp(message)
         
-        response = services.administrar_chatbot(text, number,messageId,name)
-        print("response webhook: ", response)
+        services.administrar_chatbot(text, number,messageId,name)
         return "Enviado"
 
     except Exception as e:

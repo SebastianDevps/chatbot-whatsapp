@@ -40,9 +40,6 @@ def enviar_Mensaje_whatsapp(data):
             'Authorization': f'Bearer {whatsapp_token}'
         }
         
-        # print("Enviando mensaje con token:", whatsapp_token[:10] + "...")  # Solo para debug
-        # print("URL:", whatsapp_url)
-        print("Datos:", data)
         
         response = requests.post(whatsapp_url, headers=headers, data=data)
 
@@ -50,7 +47,8 @@ def enviar_Mensaje_whatsapp(data):
         print(f"Response Text: {response.text}")
         
         if response.status_code == 200:
-            return ('mensaje enviado', 200)
+            save_message(data)
+            return data
         else:
             error_msg = f'Error al enviar mensaje: {response.status_code} - {response.text}'
             print(error_msg)
@@ -251,28 +249,38 @@ def save_message(number, text, responses, messageId):
         # Extraer y guardar las respuestas del bot
         for response in responses:
             try:
-                # Decodificar el JSON de la respuesta para obtener el mensaje real
                 response_data = json.loads(response[0])
                 bot_message = ""
                 
                 # Extraer el texto según el tipo de mensaje
                 if response_data.get('type') == 'text':
                     bot_message = response_data['text']['body']
+                elif response_data.get('type') == 'reaction':
+                    continue  # Saltamos las reacciones ya que no son mensajes de texto
                 elif response_data.get('type') == 'interactive':
-                    if 'list' in response_data['interactive']:
-                        bot_message = response_data['interactive']['body']['text']
-                    elif 'button' in response_data['interactive']:
-                        bot_message = response_data['interactive']['body']['text']
+                    if 'interactive' in response_data:
+                        if 'body' in response_data['interactive']:
+                            bot_message = response_data['interactive']['body']['text']
+                            
+                        # Agregar opciones al mensaje si existen
+                        if 'action' in response_data['interactive']:
+                            if 'buttons' in response_data['interactive']['action']:
+                                options = [btn['reply']['title'] for btn in response_data['interactive']['action']['buttons']]
+                                bot_message += "\nOpciones: " + ", ".join(options)
+                            elif 'sections' in response_data['interactive']['action']:
+                                options = [row['title'] for section in response_data['interactive']['action']['sections'] for row in section['rows']]
+                                bot_message += "\nOpciones: " + ", ".join(options)
                 
                 if bot_message:  # Solo guardar si hay mensaje
+                    response_status = "sent" if isinstance(response[1], str) else str(response[1])
                     c.execute('''
                         INSERT INTO messages 
                         (phone_number, message_text, response, timestamp, message_id, is_user)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (number, bot_message, str(response[1]), datetime.now(), None, False))
+                    ''', (number, bot_message, response_status, datetime.now(), None, False))
                 
-            except json.JSONDecodeError:
-                print(f"Error decodificando respuesta: {response}")
+            except json.JSONDecodeError as e:
+                print(f"Error decodificando respuesta: {e}")
                 continue
             except Exception as e:
                 print(f"Error procesando respuesta: {e}")
