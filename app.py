@@ -6,13 +6,24 @@ from datetime import datetime
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from bson.objectid import ObjectId
+import certifi
 
 app = Flask(__name__)
 
-# Configuración de MongoDB
-client = MongoClient(os.getenv('MONGODB_URI'), server_api=ServerApi('1'))
-db = client['whatsapp_bot']  # Nombre de la base de datos
-messages_collection = db['messages']  # Nombre de la colección
+# Configuración de MongoDB con opciones SSL
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
+
+# Opciones de conexión actualizadas
+client = MongoClient(
+    MONGODB_URI,
+    server_api=ServerApi('1'),
+    tlsCAFile=certifi.where(),  # Agregar certificado SSL
+    ssl=True,
+    connect=True
+)
+
+db = client['whatsapp_bot']
+messages_collection = db['messages']
 
 def init_db():
     try:
@@ -20,11 +31,12 @@ def init_db():
         client.admin.command('ping')
         print("¡Conexión exitosa a MongoDB!")
         
-        # Crear índices si es necesario
+        # Crear índices
         messages_collection.create_index("phone_number")
         messages_collection.create_index("timestamp")
     except Exception as e:
         print(f"Error al conectar con MongoDB: {e}")
+        raise  # Re-lanzar el error para mejor debugging
 
 @app.route('/bienvenido', methods=['GET'])
 def bienvenido():

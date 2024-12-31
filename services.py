@@ -7,9 +7,20 @@ from datetime import datetime
 import sqlite3
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
+import certifi
 
-# Configuración de MongoDB
-client = MongoClient(os.getenv('MONGODB_URI'), server_api=ServerApi('1'))
+# Configuración de MongoDB con opciones SSL
+MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
+
+# Opciones de conexión actualizadas
+client = MongoClient(
+    MONGODB_URI,
+    server_api=ServerApi('1'),
+    tlsCAFile=certifi.where(),  # Agregar certificado SSL
+    ssl=True,
+    connect=True
+)
+
 db = client['whatsapp_bot']
 messages_collection = db['messages']
 
