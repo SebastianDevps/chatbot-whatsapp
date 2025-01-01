@@ -4,34 +4,17 @@ import json
 import time
 from Reseña_Analisis import AnalizadorDeReseñas
 from datetime import datetime
-import sqlite3
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-import certifi
-import ssl
+import psycopg2
+from psycopg2.extras import DictCursor
 
-# Configuración de MongoDB con opciones SSL específicas
-MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
-
-# Configuración del cliente con opciones SSL específicas
-client = MongoClient(
-    MONGODB_URI,
-    server_api=ServerApi('1'),
-    tlsCAFile=certifi.where(),
-    tls=True,
-    tlsAllowInvalidCertificates=True,
-    connectTimeoutMS=30000,
-    socketTimeoutMS=30000,
-    serverSelectionTimeoutMS=30000
-)
-
-try:
-    db = client['whatsapp_bot']
-    messages_collection = db['messages']
-except Exception as e:
-    print(f"Error inicial al conectar con MongoDB en services: {e}")
-    db = None
-    messages_collection = None
+def get_db_connection():
+    try:
+        connection = psycopg2.connect('postgresql://postgres:FjDMYACUWuhiwSPTcsJDVaLFpyyKIeOH@autorack.proxy.rlwy.net:11272/railway')
+        print("Conexión exitosa a PostgreSQL")
+        return connection
+    except psycopg2.Error as e:
+        print(f"Error conectando a PostgreSQL: {e}")
+        return None
 
 def obtener_Mensaje_whatsapp(message):
     if 'type' not in message :
@@ -262,18 +245,18 @@ def markRead_Message(messageId):
 
 def save_message(number, text, responses, messageId):
     try:
-        # Guardar el mensaje del usuario
-        user_message = {
-            "phone_number": number,
-            "message_text": text,
-            "response": None,
-            "timestamp": datetime.now(),
-            "message_id": messageId,
-            "is_user": True
-        }
-        messages_collection.insert_one(user_message)
+        DATABASE_URL = os.getenv('DATABASE_URL')
+        connection = psycopg2.connect(DATABASE_URL)
+        cursor = connection.cursor()
         
-        # Extraer y guardar las respuestas del bot
+        # Guardar el mensaje del usuario
+        cursor.execute('''
+            INSERT INTO messages 
+            (phone_number, message_text, response, timestamp, message_id, is_user)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        ''', (number, text, None, datetime.now(), messageId, True))
+        
+        # Guardar las respuestas del bot
         for response in responses:
             try:
                 response_data = json.loads(response[0])
@@ -300,23 +283,26 @@ def save_message(number, text, responses, messageId):
                 
                 if bot_message:
                     response_status = "sent" if isinstance(response[1], str) else str(response[1])
-                    bot_response = {
-                        "phone_number": number,
-                        "message_text": bot_message,
-                        "response": response_status,
-                        "timestamp": datetime.now(),
-                        "message_id": None,
-                        "is_user": False
-                    }
-                    messages_collection.insert_one(bot_response)
+                    cursor.execute('''
+                        INSERT INTO messages 
+                        (phone_number, message_text, response, timestamp, message_id, is_user)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                    ''', (number, bot_message, response_status, datetime.now(), None, False))
                 
             except Exception as e:
                 print(f"Error procesando respuesta: {e}")
                 continue
             
+        connection.commit()
         print("Mensaje guardado correctamente")
-    except Exception as e:
+        
+    except psycopg2.Error as e:
         print(f"Error guardando mensaje: {e}")
+    finally:
+        if 'connection' in locals():
+            if 'cursor' in locals():
+                cursor.close()
+            connection.close()
 
 
 def administrar_chatbot(text,number, messageId, name):

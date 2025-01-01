@@ -3,53 +3,54 @@ import services
 from flask import jsonify
 import os
 from datetime import datetime
-from pymongo.mongo_client import MongoClient
-from pymongo.server_api import ServerApi
-from bson.objectid import ObjectId
-import certifi
+import psycopg2
+from psycopg2.extras import DictCursor
 
 app = Flask(__name__)
 
-# Configuración de MongoDB
-MONGODB_URI = os.getenv('MONGODB_URI', 'mongodb+srv://guerrasebastian16:<db_password>@chatbot.gixrn.mongodb.net/?retryWrites=true&w=majority&appName=ChatBot')
-
-# Configuración del cliente con opciones simplificadas
-client = MongoClient(
-    MONGODB_URI,
-    server_api=ServerApi('1'),
-    tlsCAFile=certifi.where(),
-    tls=True,
-    tlsAllowInvalidCertificates=True,
-    connectTimeoutMS=30000,
-    socketTimeoutMS=30000,
-    serverSelectionTimeoutMS=30000
-)
-
-try:
-    db = client['whatsapp_bot']
-    messages_collection = db['messages']
-except Exception as e:
-    print(f"Error inicial al conectar con MongoDB: {e}")
-    db = None
-    messages_collection = None
+def get_db_connection():
+    try:
+        # Usar la URL completa de conexión
+        connection = psycopg2.connect('postgresql://postgres:FjDMYACUWuhiwSPTcsJDVaLFpyyKIeOH@autorack.proxy.rlwy.net:11272/railway')
+        print("Conexión exitosa a PostgreSQL")
+        return connection
+    except psycopg2.Error as e:
+        print(f"Error conectando a PostgreSQL: {e}")
+        print(f"URL de conexión utilizada: {os.getenv('DATABASE_URL')}")
+        return None
 
 def init_db():
+    connection = None
     try:
-        # Verificar conexión sin usar ping
-        dbs = client.list_database_names()
-        print("¡Conexión exitosa a MongoDB!")
-        print(f"Bases de datos disponibles: {dbs}")
-        
-        if db and messages_collection:
-            # Crear índices si es necesario
-            messages_collection.create_index("phone_number")
-            messages_collection.create_index("timestamp")
-    except Exception as e:
-        print(f"Error al conectar con MongoDB: {e}")
-        return False
-    return True
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor()
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS messages (
+                    id SERIAL PRIMARY KEY,
+                    phone_number VARCHAR(20) NOT NULL,
+                    message_text TEXT NOT NULL,
+                    response TEXT,
+                    timestamp TIMESTAMP NOT NULL,
+                    message_id VARCHAR(100),
+                    is_user BOOLEAN NOT NULL
+                );
+                
+                CREATE INDEX IF NOT EXISTS idx_phone_number ON messages(phone_number);
+                CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
+            ''')
+            
+            connection.commit()
+            print("Base de datos inicializada correctamente")
+            
+    except psycopg2.Error as e:
+        print(f"Error inicializando la base de datos: {e}")
+    finally:
+        if connection:
+            connection.close()
 
-# Reemplazar before_first_request con with app.app_context()
+# Inicializar la base de datos al arrancar
 with app.app_context():
     init_db()
 
@@ -95,27 +96,36 @@ def recibir_mensajes():
 def view_messages():
     try:
         phone = request.args.get('phone')
+        connection = get_db_connection()
         
-        # Consulta de mensajes
-        if phone:
-            messages = messages_collection.find(
-                {"phone_number": phone}
-            ).sort("timestamp", -1)
-        else:
-            messages = messages_collection.find().sort("timestamp", -1)
-        
-        # Convertir cursor a lista
-        messages = list(messages)
-        
-        # Obtener números de teléfono únicos
-        phone_numbers = messages_collection.distinct("phone_number")
-        
-        return render_template('messages.html', 
-                             messages=messages, 
-                             phone_numbers=phone_numbers,
-                             selected_phone=phone)
-    except Exception as e:
-        print(f"Error in view_messages: {e}")
+        if connection:
+            cursor = connection.cursor(cursor_factory=DictCursor)
+            
+            # Consulta de mensajes
+            if phone:
+                cursor.execute(
+                    "SELECT * FROM messages WHERE phone_number = %s ORDER BY timestamp DESC",
+                    (phone,)
+                )
+            else:
+                cursor.execute("SELECT * FROM messages ORDER BY timestamp DESC")
+            
+            messages = cursor.fetchall()
+            
+            # Obtener números de teléfono únicos
+            cursor.execute("SELECT DISTINCT phone_number FROM messages")
+            phone_numbers = [row['phone_number'] for row in cursor.fetchall()]
+            
+            cursor.close()
+            connection.close()
+            
+            return render_template('messages.html', 
+                                 messages=messages, 
+                                 phone_numbers=phone_numbers,
+                                 selected_phone=phone)
+                                 
+    except psycopg2.Error as e:
+        print(f"Error en view_messages: {e}")
         return str(e), 500
 
 if __name__ == '__main__':
