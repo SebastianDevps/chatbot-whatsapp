@@ -245,8 +245,10 @@ def markRead_Message(messageId):
 
 def save_message(number, text, responses, messageId):
     try:
-        DATABASE_URL = os.getenv('DATABASE_URL')
-        connection = psycopg2.connect(DATABASE_URL)
+        DB_URL = 'postgresql://postgres:FjDMYACUWuhiwSPTcsJDVaLFpyyKIeOH@autorack.proxy.rlwy.net:11272/railway'
+
+        # Usar la URL global definida arriba
+        connection = psycopg2.connect(DB_URL + "?sslmode=require")
         cursor = connection.cursor()
         
         # Guardar el mensaje del usuario
@@ -298,6 +300,8 @@ def save_message(number, text, responses, messageId):
         
     except psycopg2.Error as e:
         print(f"Error guardando mensaje: {e}")
+        if connection:
+            connection.rollback()
     finally:
         if 'connection' in locals():
             if 'cursor' in locals():
@@ -421,7 +425,7 @@ def administrar_chatbot(text,number, messageId, name):
         # print("IA Response", respuesta)    
         body = respuesta
         footer = "La Pizzada"
-        options = ["Lo siento, no entendí tu mensaje. Puedes escribir 'hola' para ver el menú principal o 'información' para más detalles sobre nuestro servicio. 😊"]
+        options = ["Volver al menú principal", "Salir"]
 
         listReplyData = listReply_Message(number, options, body, footer, "sed10",messageId)
         list.append(listReplyData)
