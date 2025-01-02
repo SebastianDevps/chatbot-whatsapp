@@ -95,34 +95,30 @@ def recibir_mensajes():
 @app.route('/messages')
 def view_messages():
     try:
-        phone = request.args.get('phone')
         connection = get_db_connection()
-        
+        numberAndMessages = []
         if connection:
             cursor = connection.cursor(cursor_factory=DictCursor)
             
-            # Consulta de mensajes
-            if phone:
-                cursor.execute(
-                    "SELECT * FROM messages WHERE phone_number = %s ORDER BY timestamp DESC",
-                    (phone,)
-                )
-            else:
-                cursor.execute("SELECT * FROM messages ORDER BY timestamp DESC")
+            cursor.execute("SELECT * FROM messages ORDER BY timestamp DESC")
             
             messages = cursor.fetchall()
             
             # Obtener números de teléfono únicos
             cursor.execute("SELECT DISTINCT phone_number FROM messages")
+
             phone_numbers = [row['phone_number'] for row in cursor.fetchall()]
+            
+            for phone in phone_numbers:
+                numberAndMessages.append({
+                    "phone_number": phone,
+                    "messages": [message for message in messages if message['phone_number'] == phone]
+                })
             
             cursor.close()
             connection.close()
             
-            return render_template('messages.html', 
-                                 messages=messages, 
-                                 phone_numbers=phone_numbers,
-                                 selected_phone=phone)
+            return numberAndMessages
                                  
     except psycopg2.Error as e:
         print(f"Error en view_messages: {e}")
