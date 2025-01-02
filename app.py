@@ -35,9 +35,7 @@ def init_db():
                     timestamp TIMESTAMP NOT NULL,
                     message_id VARCHAR(100),
                     is_user BOOLEAN NOT NULL
-                    name TEXT,
                 );
-                
                 CREATE INDEX IF NOT EXISTS idx_phone_number ON messages(phone_number);
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
             ''')
