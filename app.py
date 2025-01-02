@@ -34,7 +34,8 @@ def init_db():
                     response TEXT,
                     timestamp TIMESTAMP NOT NULL,
                     message_id VARCHAR(100),
-                    is_user BOOLEAN NOT NULL
+                    is_user BOOLEAN NOT NULL,
+                    name VARCHAR(100)
                 );
                 CREATE INDEX IF NOT EXISTS idx_phone_number ON messages(phone_number);
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);

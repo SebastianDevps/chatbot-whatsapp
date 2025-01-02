@@ -246,17 +246,18 @@ def markRead_Message(messageId):
 def save_message(number, text, responses, messageId, timestamp, name):
     try:
         DB_URL = 'postgresql://postgres:FjDMYACUWuhiwSPTcsJDVaLFpyyKIeOH@autorack.proxy.rlwy.net:11272/railway'
-
-        # Usar la URL global definida arriba
         connection = psycopg2.connect(DB_URL + "?sslmode=require")
         cursor = connection.cursor()
+        
+        # Convertir el timestamp de Unix (entero) a datetime
+        timestamp_datetime = datetime.fromtimestamp(timestamp)
         
         # Guardar el mensaje del usuario
         cursor.execute('''
             INSERT INTO messages 
             (phone_number, message_text, response, timestamp, message_id, is_user, name)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        ''', (number, text, None, timestamp, messageId, True, name))
+        ''', (number, text, None, timestamp_datetime, messageId, True, name))
         
         # Guardar las respuestas del bot
         for response in responses:
@@ -285,11 +286,13 @@ def save_message(number, text, responses, messageId, timestamp, name):
                 
                 if bot_message:
                     response_status = "sent" if isinstance(response[1], str) else str(response[1])
+                    # Usar datetime.now() para las respuestas del bot
+                    current_time = datetime.now()
                     cursor.execute('''
                         INSERT INTO messages 
                         (phone_number, message_text, response, timestamp, message_id, is_user)
                         VALUES (%s, %s, %s, %s, %s, %s)
-                    ''', (number, bot_message, response_status, datetime.now(), None, False))
+                    ''', (number, bot_message, response_status, current_time, None, False))
                 
             except Exception as e:
                 print(f"Error procesando respuesta: {e}")
