@@ -243,7 +243,7 @@ def markRead_Message(messageId):
 
 
 
-def save_message(number, text, responses, messageId):
+def save_message(number, text, responses, messageId, timestamp, name):
     try:
         DB_URL = 'postgresql://postgres:FjDMYACUWuhiwSPTcsJDVaLFpyyKIeOH@autorack.proxy.rlwy.net:11272/railway'
 
@@ -254,9 +254,9 @@ def save_message(number, text, responses, messageId):
         # Guardar el mensaje del usuario
         cursor.execute('''
             INSERT INTO messages 
-            (phone_number, message_text, response, timestamp, message_id, is_user)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', (number, text, None, datetime.now(), messageId, True))
+            (phone_number, message_text, response, timestamp, message_id, is_user, name)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (number, text, None, timestamp, messageId, True, name))
         
         # Guardar las respuestas del bot
         for response in responses:
@@ -309,10 +309,10 @@ def save_message(number, text, responses, messageId):
             connection.close()
 
 
-def administrar_chatbot(text,number, messageId, name):
+def administrar_chatbot(text,number, messageId, name, timestamp):
     text = text.lower()
     list = []
-    print("mensaje de "+ name + ": ",text)
+    print("mensaje de "+ name + ": ",text, "hora: ", timestamp)
 
     markRead = markRead_Message(messageId)
     list.append(markRead)
@@ -436,7 +436,7 @@ def administrar_chatbot(text,number, messageId, name):
         responses.append((item, response[0]))  # Guardamos el mensaje enviado y su respuesta
     
     # Guardar mensajes en la BD
-    save_message(number, text, responses, messageId)
+    save_message(number, text, responses, messageId, timestamp, name)
     
     return [resp[1] for resp in responses]
 

@@ -35,6 +35,7 @@ def init_db():
                     timestamp TIMESTAMP NOT NULL,
                     message_id VARCHAR(100),
                     is_user BOOLEAN NOT NULL
+                    name TEXT,
                 );
                 
                 CREATE INDEX IF NOT EXISTS idx_phone_number ON messages(phone_number);
@@ -86,7 +87,7 @@ def recibir_mensajes():
         name = contacts['profile']['name']
         text = services.obtener_Mensaje_whatsapp(message)
         
-        services.administrar_chatbot(text, number, messageId, name)
+        services.administrar_chatbot(text, number, messageId, name, timestamp)
         return "Enviado"
 
     except Exception as e:
