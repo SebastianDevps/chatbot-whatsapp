@@ -5,8 +5,17 @@ import os
 from datetime import datetime
 import psycopg2
 from psycopg2.extras import DictCursor
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+    
+})
 
 def get_db_connection():
     try:
@@ -35,7 +44,7 @@ def init_db():
                     timestamp TIMESTAMP NOT NULL,
                     message_id VARCHAR(100),
                     is_user BOOLEAN NOT NULL,
-                    name VARCHAR(100)
+                    is_read BOOLEAN DEFAULT FALSE
                 );
                 CREATE INDEX IF NOT EXISTS idx_phone_number ON messages(phone_number);
                 CREATE INDEX IF NOT EXISTS idx_timestamp ON messages(timestamp);
@@ -95,36 +104,74 @@ def recibir_mensajes():
 @app.route('/messages')
 def view_messages():
     try:
+        number = request.args.get('number')
         connection = get_db_connection()
-        numberAndMessages = []
+        
         if connection:
             cursor = connection.cursor(cursor_factory=DictCursor)
             
-            cursor.execute("SELECT * FROM messages ORDER BY timestamp DESC")
-            
-            messages = cursor.fetchall()
-            
-            # Obtener números de teléfono únicos
-            cursor.execute("SELECT DISTINCT phone_number FROM messages")
-
-            phone_numbers = [row['phone_number'] for row in cursor.fetchall()]
-            
-            for phone in phone_numbers:
-                numberAndMessages.append({
-                    "phone_number": phone,
-                    "messages": [message for message in messages if message['phone_number'] == phone]
-                })
+            if number:
+                # Si se proporciona un número, devolver los mensajes ordenados por timestamp
+                cursor.execute("""
+                    SELECT id, phone_number, message_text, response, 
+                           timestamp, message_id, is_user, name 
+                    FROM messages 
+                    WHERE phone_number = %s 
+                    ORDER BY timestamp ASC
+                """, (number,))
+                
+                messages = [dict(message) for message in cursor.fetchall()]
+                result = [{
+                    "phone_number": number,
+                    "messages": messages
+                }]
+            else:
+                # Si no se proporciona número, devolver la lista de números con su último mensaje
+                cursor.execute("""
+                    SELECT DISTINCT ON (phone_number) 
+                        id, phone_number, message_text, response, 
+                        timestamp, message_id, is_user, name
+                    FROM messages 
+                    ORDER BY phone_number, timestamp ASC
+                """)
+                
+                contacts = cursor.fetchall()
+                result = [{
+                    "phone_number": contact['phone_number'],
+                    "messages": []
+                } for contact in contacts]
             
             cursor.close()
             connection.close()
             
-            return numberAndMessages
+            return jsonify(result)
                                  
     except psycopg2.Error as e:
         print(f"Error en view_messages: {e}")
-        return str(e), 500
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/messages/read', methods=['POST'])
+def mark_as_read():
+    try:
+        number = request.json.get('number')
+        if not number:
+            return jsonify({"error": "Number is required"}), 400
+
+        connection = get_db_connection()
+        if connection:
+            cursor = connection.cursor()
+            cursor.execute("""
+                UPDATE messages 
+                SET is_read = TRUE 
+                WHERE phone_number = %s
+            """, (number,))
+            connection.commit()
+            cursor.close()
+            connection.close()
+            return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run()
-
-app = app
+    app.run(debug=True)
+    
